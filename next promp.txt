@@ -1,0 +1,11 @@
+1. AnalysisService
+2. Generate analysis.json during upload
+3. Save marketplace in analysis.json
+4. Save courier counts
+5. Save size counts
+6. Save SKU counts
+7. GET /jobs/{job_id}/analysis
+8. Courier priority sorting
+9. Excel export
+10. Frontend integration
+

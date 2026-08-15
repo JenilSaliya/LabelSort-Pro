@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+backend/temp/
+*.pyc
+
+# Virtual Environment
+venv/
+
+# Temp Jobs
+backend/temp/
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
