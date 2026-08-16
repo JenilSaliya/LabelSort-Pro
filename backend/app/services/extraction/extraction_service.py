@@ -1,4 +1,4 @@
-import fitz
+import pymupdf as fitz
 
 from app.models.label import Label
 

@@ -44,8 +44,9 @@ app.add_exception_handler(
 
 app.include_router(api_router)
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 def root():
     return {
-        "message" : "Welcome to LabelSort API"
+        "status": "ok",
+        "message": "Welcome to LabelSort API"
     }

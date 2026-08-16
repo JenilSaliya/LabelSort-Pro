@@ -2,9 +2,9 @@ from fastapi import APIRouter
 
 router = APIRouter()
 
-@router.get("/")
+@router.api_route("/", methods=["GET", "HEAD"])
 def health_check():
     return {
-        "status":"ok",
-        "message":"LabelSort Backend is running"
+        "status": "ok",
+        "message": "LabelSort Backend is running"
     }
