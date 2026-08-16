@@ -20,30 +20,9 @@ class SortingService:
         options: SortOptions,
     ) -> list[Label]:
 
-        priority_map = {
-            courier: index
-            for index, courier
-            in enumerate(
-                options.courier_priority
-            )
-        }
-
-        if len(options.fields) == 1:
-
-            return self.sorter.sort_multiple(
-                labels,
-                keys=options.fields,
-                reverse=options.reverse,
-                courier_priority=(
-                    options.courier_priority
-                ),
-            )
-
         return self.sorter.sort_multiple(
             labels,
             keys=options.fields,
             reverse=options.reverse,
-            courier_priority=(
-                options.courier_priority
-            ),
+            courier_priority=options.courier_priority,
         )

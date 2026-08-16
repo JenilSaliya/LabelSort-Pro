@@ -9,7 +9,13 @@ class CleanupService:
 
     def cleanup_old_jobs(self) -> None:
 
+
         jobs_dir = settings.JOBS_DIR
+
+        jobs_dir.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
 
         retention_hours = settings.JOB_RETENTION_HOURS
 

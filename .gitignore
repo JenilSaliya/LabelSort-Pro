@@ -1,11 +1,14 @@
 # Python
 backend/venv/
 backend/temp/
+nextpropmt.txt
 __pycache__/
 *.pyc
 
 # Node
 frontend/node_modules/
+frontend/dist/
+frontend/.env.local
 
 # Environment
 .env

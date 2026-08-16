@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi import HTTPException
-
-from app.core.config import settings
+from app.utils.job_path import get_job_dir
+# from app.core.config import settings
 from app.services.sorting_config.sorting_config_service import (
     SortingConfigService,
 )
@@ -18,12 +18,16 @@ async def get_sorting_options(
     job_id: str,
 ):
 
-    analysis_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "reports"
-        / "analysis.json"
-    )
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
+
+    analysis_path = job_dir / "reports" / "analysis.json"
+
 
     if not analysis_path.exists():
 

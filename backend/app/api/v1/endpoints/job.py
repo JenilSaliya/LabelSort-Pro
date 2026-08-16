@@ -3,8 +3,9 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-from app.core.config import settings
+# from app.core.config import settings
 from app.utils.json_utils import load_json
+from app.utils.job_path import get_job_dir
 
 router = APIRouter()
 
@@ -15,11 +16,15 @@ def get_job(job_id: str):
     Return job metadata.
     """
 
-    metadata_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "metadata.json"
-    )
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
+
+    metadata_path = job_dir / "metadata.json"
 
     if not metadata_path.exists():
         raise HTTPException(
@@ -35,13 +40,16 @@ def download_sorted_pdf(job_id: str):
     """
     Download the sorted PDF.
     """
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
 
-    pdf_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "output"
-        / "sorted.pdf"
-    )
+    pdf_path = job_dir / "output" / "sorted.pdf"
+   
 
     if not pdf_path.exists():
         raise HTTPException(
@@ -63,12 +71,15 @@ def preview_sorted_pdf(job_id: str):
     Open sorted PDF in browser.
     """
 
-    pdf_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "output"
-        / "sorted.pdf"
-    )
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
+    
+    pdf_path = job_dir / "output" / "sorted.pdf"
 
     if not pdf_path.exists():
         raise HTTPException(
@@ -88,12 +99,16 @@ def get_analysis(
     job_id: str,
 ):
 
-    analysis_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "reports"
-        / "analysis.json"
-    )
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
+
+    analysis_path = job_dir / "reports" / "analysis.json"
+
 
     if not analysis_path.exists():
 
@@ -111,12 +126,18 @@ def get_analysis(
 async def download_statistics(
     job_id: str,
 ):
-    excel_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "reports"
-        / "statistics.xlsx"
-    )
+
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
+
+    excel_path = job_dir / "reports" / "statistics.xlsx"
+    
+    
 
     if not excel_path.exists():
         raise HTTPException(

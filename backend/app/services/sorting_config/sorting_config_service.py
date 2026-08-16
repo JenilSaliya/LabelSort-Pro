@@ -12,48 +12,30 @@ class SortingConfigService:
             analysis_path
         )
 
+        field_values = {}
+
+        for field_id, field_data in (
+            analysis["field_statistics"]
+            .items()
+        ):
+            field_values[field_id] = list(
+                field_data["values"]
+                .keys()
+            )
+
         return {
-            "available_fields":
+            "sortable_fields":
                 analysis[
-                    "available_fields"
+                    "sortable_fields"
                 ],
 
-            "field_values": {
-                "courier_partner":
-                    list(
-                        analysis[
-                            "courier_partner"
-                        ].keys()
-                    ),
+            "courier_priority_options":
+                analysis[
+                    "courier_priority_options"
+                ],
 
-                "sku":
-                    list(
-                        analysis[
-                            "sku"
-                        ].keys()
-                    ),
-
-                "size":
-                    list(
-                        analysis[
-                            "size"
-                        ].keys()
-                    ),
-
-                "quantity":
-                    list(
-                        analysis[
-                            "quantity"
-                        ].keys()
-                    ),
-
-                "color":
-                    list(
-                        analysis[
-                            "color"
-                        ].keys()
-                    ),
-            },
+            "field_values":
+                field_values,
 
             "supports_custom_order": [
                 "courier_partner"

@@ -2,7 +2,9 @@ from pydantic import BaseModel, Field
 
 
 class ProcessRequest(BaseModel):
-    fields: list[str]
+    fields: list[str] = Field(
+        min_length=1
+    )
 
     reverse: bool = False
 

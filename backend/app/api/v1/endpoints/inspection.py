@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
-
-from app.core.config import settings
+from app.utils.job_path import get_job_dir
+# from app.core.config import settings
 from app.services.pdf.inspection_service import PDFInspectionService
 
 
@@ -17,12 +17,16 @@ async def inspect_pdf(job_id: str):
     Inspect the original PDF belonging to a job.
     """
 
-    pdf_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "original"
-        / "original.pdf"
-    )
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
+
+    pdf_path = job_dir / "original" / "original.pdf"
+    
 
     try:
         result = inspection_service.inspect_pdf(pdf_path)
@@ -53,13 +57,16 @@ async def inspect_page_coordinates(
     """
     Inspect text coordinates for one PDF page.
     """
+    try:
+        job_dir = get_job_dir(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid job ID.",
+        )
 
-    pdf_path = (
-        settings.JOBS_DIR
-        / job_id
-        / "original"
-        / "original.pdf"
-    )
+    pdf_path = job_dir / "original" / "original.pdf"
+    
 
     try:
         result = inspection_service.inspect_page_coordinates(

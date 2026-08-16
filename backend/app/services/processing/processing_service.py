@@ -55,7 +55,6 @@ class ProcessingService:
     """
 
     def __init__(self) -> None:
-        self.analysis_service = AnalysisService()
         self.extraction_service = ExtractionService()
         self.pipeline = LabelSortPipeline()
 
@@ -111,6 +110,17 @@ class ProcessingService:
             exist_ok=True,
         )
 
+        metadata_path = job_dir / "metadata.json"
+        
+        metadata = load_json(metadata_path)
+
+        metadata["status"] = "sotring"
+        metadata["updated_at"] = datetime.now().isoformat()
+
+        save_json(
+            metadata_path,
+            metadata,
+        )
         # --------------------------------------------------
         # STEP 3 - Parse PDF
         # --------------------------------------------------
@@ -121,24 +131,7 @@ class ProcessingService:
             )
         )
 
-        # analysis = (
-        #     self.analysis_service.analyze(
-        #         labels=labels,
-        #         marketplace=marketplace,
-        #     )
-        # )
-
-
-        # analysis_path = (
-        #     job_dir
-        #     / "reports"
-        #     / "analysis.json"
-        # )
-
-        # save_json(
-        #     analysis_path,
-        #     analysis.model_dump(),
-        # )
+       
 
         # --------------------------------------------------
         # STEP 5 - Sort labels and create PDF
@@ -155,7 +148,7 @@ class ProcessingService:
 
         metadata = load_json(metadata_path)
 
-        metadata["status"] = "processed"
+        metadata["status"] = "completed"
         metadata["marketplace"] = (marketplace)
         metadata["label_groups"] = len(labels)
         metadata["updated_at"] = datetime.now().isoformat()

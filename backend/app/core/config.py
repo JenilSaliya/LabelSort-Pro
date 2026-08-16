@@ -14,6 +14,10 @@ class Settings(BaseSettings):
 
     MAX_FILE_SIZE_MB: int = 100
 
+    FRONTEND_URL: str = "http://localhost:5173"
+
+    FRONTEND_NETWORK_URL: str = "http://192.168.1.6:5173"
+
     ALLOWED_EXTENSIONS: tuple[str, ...] = ("pdf",)
 
     JOB_RETENTION_HOURS: int = 6
