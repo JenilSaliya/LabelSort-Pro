@@ -30,11 +30,18 @@ class ExtractionService:
     def extract_labels(
         self,
         input_pdf,
-    ) -> tuple[str, list[Label]]:
+    ) -> tuple[str, int, list[Label]]:
+        """
+        Extract labels from a PDF file.
+
+        Returns (marketplace, page_count, labels).
+        """
 
         labels: list[Label] = []
 
         with fitz.open(input_pdf) as pdf:
+
+            page_count = len(pdf)
 
             first_page_text = (
                 pdf[0].get_text("text")
@@ -87,5 +94,6 @@ class ExtractionService:
 
         return (
             marketplace.value,
+            page_count,
             labels,
         )

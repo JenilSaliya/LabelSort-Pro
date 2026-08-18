@@ -2,7 +2,6 @@ from datetime import datetime
 import shutil
 
 from fastapi import UploadFile
-from pypdf import PdfReader
 
 from app.services.export.excel_export_service import ExcelExportService
 
@@ -25,6 +24,9 @@ from app.utils.validation import (
 from app.services.extraction.extraction_service import (
     ExtractionService,
 )
+from app.services.extraction.label_cache import (
+    LabelCache,
+)
 
 from app.services.analysis.analysis_service import (
     AnalysisService,
@@ -40,6 +42,7 @@ class UploadService:
         self.excel_exporter = ExcelExportService()
         self.cleanup_service = CleanupService()
         self.pdf_merge_service = PdfMergeService()
+        self.label_cache = LabelCache()
 
     async def upload_pdf(self, files: list[UploadFile]) -> dict:
 
@@ -118,14 +121,22 @@ class UploadService:
             # Get file size.
             file_size = destination.stat().st_size
 
-            # Get page count.
-            reader = PdfReader(destination)
-            page_count = len(reader.pages)
-
-            marketplace, labels =(
+            # Extract labels and page count in one pass.
+            # pymupdf returns page_count for free during extraction,
+            # eliminating the need for a separate PdfReader call.
+            marketplace, page_count, labels = (
                 self.extraction_service.extract_labels(
                     destination
                 )
+            )
+
+            # Cache labels to disk so processing step
+            # can load them without re-parsing the PDF.
+            self.label_cache.save(
+                labels=labels,
+                marketplace=marketplace,
+                page_count=page_count,
+                job_dir=job_dir,
             )
 
             analysis =(

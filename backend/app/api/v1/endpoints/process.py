@@ -27,10 +27,6 @@ async def process_job(
             request.courier_priority
         ),
     )
-    print("FIELDS:", options.fields)
-    print("REVERSE:", options.reverse)
-    print("COURIER PRIORITY:", options.courier_priority)
-
     result = processing_service.process_job(
         job_id=job_id,
         options=options,

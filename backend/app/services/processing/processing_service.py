@@ -1,35 +1,19 @@
 from pathlib import Path
-
-# import fitz
+from datetime import datetime
 
 from app.core.config import settings
-# from app.models.label import Label
+from app.core.constants import (
+    STATUS_SORTING,
+    STATUS_COMPLETED,
+)
 from app.models.sort_options import SortOptions
-
-# from app.services.meesho.parser import MeeshoParser
-# from app.services.meesho.label_builder import build_label
 from app.services.pipeline.label_sort_pipeline import LabelSortPipeline
-from datetime import datetime
+from app.services.extraction.label_cache import LabelCache
 
 from app.utils.json_utils import (
     load_json,
     save_json,
 )
-
-# from app.services.marketplace.detector import (
-#     # Marketplace,
-#     MarketplaceDetector,
-# )
-
-from app.services.analysis.analysis_service import (
-    AnalysisService,
-)
-
-from app.services.extraction.extraction_service import (
-    ExtractionService,
-)
-
-
 
 
 class ProcessingService:
@@ -38,13 +22,7 @@ class ProcessingService:
 
     Flow:
 
-        Original PDF
-            ↓
-        MeeshoParser
-            ↓
-        Label Builder
-            ↓
-        Label objects
+        Cached Labels (from upload step)
             ↓
         LabelSortPipeline
             ↓
@@ -55,7 +33,7 @@ class ProcessingService:
     """
 
     def __init__(self) -> None:
-        self.extraction_service = ExtractionService()
+        self.label_cache = LabelCache()
         self.pipeline = LabelSortPipeline()
 
     def process_job(
@@ -114,7 +92,7 @@ class ProcessingService:
         
         metadata = load_json(metadata_path)
 
-        metadata["status"] = "sotring"
+        metadata["status"] = STATUS_SORTING
         metadata["updated_at"] = datetime.now().isoformat()
 
         save_json(
@@ -122,19 +100,15 @@ class ProcessingService:
             metadata,
         )
         # --------------------------------------------------
-        # STEP 3 - Parse PDF
+        # STEP 3 - Load cached labels (no PDF re-parsing)
         # --------------------------------------------------
 
-        marketplace, labels = (
-            self.extraction_service.extract_labels(
-                input_pdf
-            )
+        marketplace, page_count, labels = (
+            self.label_cache.load(job_dir)
         )
 
-       
-
         # --------------------------------------------------
-        # STEP 5 - Sort labels and create PDF
+        # STEP 4 - Sort labels and create PDF
         # --------------------------------------------------
 
         output_path = self.pipeline.sort_labels(
@@ -148,7 +122,7 @@ class ProcessingService:
 
         metadata = load_json(metadata_path)
 
-        metadata["status"] = "completed"
+        metadata["status"] = STATUS_COMPLETED
         metadata["marketplace"] = (marketplace)
         metadata["label_groups"] = len(labels)
         metadata["updated_at"] = datetime.now().isoformat()
@@ -158,7 +132,7 @@ class ProcessingService:
             metadata,
         )
         # --------------------------------------------------
-        # STEP 6 - Return processing result
+        # STEP 5 - Return processing result
         # --------------------------------------------------
 
         return {
@@ -167,9 +141,6 @@ class ProcessingService:
             "marketplace": marketplace,
             "input_pdf": str(input_pdf),
             "output_pdf": str(output_path),
-            "page_count": sum(
-                len(label.pages) 
-                for label in labels
-            ),
+            "page_count": page_count,
             "label_count": len(labels),
-        }
+        }
