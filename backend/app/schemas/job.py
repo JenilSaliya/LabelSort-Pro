@@ -1,21 +1,22 @@
-from datetime import datetime
 from pydantic import BaseModel
 
+
 class JobMetadata(BaseModel):
-    job_id:str
-    status:str
-
+    job_id: str
+    status: str
+    progress: int | None = 0
+    current_step: str | None = None
+    pages_processed: int | None = None
+    total_pages: int | None = None
+    error: str | None = None
     marketplace: str | None = None
-
-    filename: str | None = None
-
+    original_filename: str | None = None
+    stored_filename: str | None = None
     file_size: int | None = None
-
     page_count: int | None = None
-
     label_groups: int | None = None
-
-    created_at: datetime
-
-    updated_at: datetime
-    
+    uploaded_filenames: list[str] | None = None
+    uploaded_file_count: int | None = None
+    mime_type: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None

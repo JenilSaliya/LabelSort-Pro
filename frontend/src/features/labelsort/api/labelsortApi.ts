@@ -25,7 +25,7 @@ export const labelsortApi = {
   },
 
   /**
-   * Upload PDF Files
+   * Upload PDF Files (short-lived HTTP request returning job_id)
    */
   async uploadFiles(
     files: File[],
@@ -71,6 +71,38 @@ export const labelsortApi = {
     } catch (error) {
       throw parseApiError(error);
     }
+  },
+
+  /**
+   * Poll Job Status until completed or failed
+   */
+  async pollJobStatus(
+    jobId: string,
+    onProgress?: (job: JobMetadata) => void,
+    intervalMs: number = 1000,
+    timeoutMs: number = 600000 // 10 minutes maximum polling
+  ): Promise<JobMetadata> {
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < timeoutMs) {
+      const job = await this.getJob(jobId);
+
+      if (onProgress) {
+        onProgress(job);
+      }
+
+      if (job.status === "completed") {
+        return job;
+      }
+
+      if (job.status === "failed") {
+        throw new Error(job.error || "Job processing failed on server.");
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error("Job processing timed out on server. Please try again.");
   },
 
   /**

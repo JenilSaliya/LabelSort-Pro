@@ -1,7 +1,9 @@
-# Upload Status
+# Upload & Job Lifecycle Status Constants
 STATUS_UPLOADED = "uploaded"
-STATUS_ANALYZING = "analyzing"
+STATUS_QUEUED = "queued"
+STATUS_PROCESSING = "processing"
 STATUS_PARSING = "parsing"
+STATUS_ANALYZING = "analyzing"
 STATUS_SORTING = "sorting"
 STATUS_GENERATING = "generating"
 STATUS_COMPLETED = "completed"

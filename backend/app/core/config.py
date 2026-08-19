@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     ALLOWED_EXTENSIONS: tuple[str, ...] = ("pdf",)
 
-    JOB_RETENTION_HOURS: int = 6
+    JOB_RETENTION_HOURS: int = 1
 
     LOG_LEVEL: str = "INFO"
 

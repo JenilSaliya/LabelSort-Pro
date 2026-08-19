@@ -1,8 +1,14 @@
 export interface JobMetadata {
   job_id: string;
   status: string;
+  progress?: number;
+  current_step?: string;
+  pages_processed?: number;
+  total_pages?: number;
+  error?: string | null;
   marketplace?: string | null;
   filename?: string | null;
+  stored_filename?: string | null;
   file_size?: number | null;
   page_count?: number | null;
   label_groups?: number | null;
@@ -31,4 +37,5 @@ export interface UploadResultData {
   page_count?: number;
   label_count?: number;
   uploaded_file_count?: number;
+  file_size?: number;
 }

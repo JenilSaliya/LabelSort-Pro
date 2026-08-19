@@ -110,37 +110,63 @@ export function UploadPage() {
 
     try {
       setIsUploading(true);
-      setUploadProgress(15);
+      setUploadProgress(10);
       setUploadStage("Uploading labels to server...");
 
+      // 1. Upload file(s) to server (short-lived HTTP request)
       const response = await labelsortApi.uploadFiles(
         selectedFiles,
         (percent) => {
-          const calculated = Math.min(85, Math.max(15, percent));
+          const calculated = Math.min(25, Math.max(5, Math.round(percent / 4)));
           setUploadProgress(calculated);
-          if (percent > 75) {
-            setUploadStage("Extracting barcodes & SKU metadata...");
-          }
         }
       );
 
-      if (response.success && response.data?.job_id) {
-        setUploadProgress(100);
-        setUploadStage("Analysis ready! Loading sorting options...");
-        const jobId = response.data.job_id;
-        sessionStorage.setItem("labelsort_active_job_id", jobId);
-        toast.success("Labels uploaded successfully!");
-
-        setTimeout(() => {
-          navigate(APP_ROUTES.SORT(jobId));
-        }, 400);
-      } else {
-        throw new Error(response.message || "Failed to process uploaded labels.");
+      if (!response.success || !response.data?.job_id) {
+        throw new Error(response.message || "Failed to initiate upload job.");
       }
+
+      const jobId = response.data.job_id;
+      sessionStorage.setItem("labelsort_active_job_id", jobId);
+      setUploadProgress(25);
+      setUploadStage("Processing labels on server...");
+
+      // 2. Poll server for background extraction and analysis progress
+      const completedJob = await labelsortApi.pollJobStatus(jobId, (job) => {
+        if (job.progress !== undefined && job.progress !== null && job.progress > 0) {
+          // Progress reported by server (10% - 100%)
+          setUploadProgress(Math.max(25, job.progress));
+        }
+
+        if (job.current_step === "extracting") {
+          if (job.pages_processed && job.total_pages) {
+            setUploadStage(`Extracting labels (${job.pages_processed}/${job.total_pages} pages)...`);
+          } else {
+            setUploadStage("Extracting barcodes & SKU metadata...");
+          }
+        } else if (job.current_step === "caching") {
+          setUploadStage("Caching label dataset...");
+        } else if (job.current_step === "analyzing") {
+          setUploadStage("Analyzing couriers & product metrics...");
+        } else if (job.current_step === "generating_report") {
+          setUploadStage("Generating summary reports & statistics...");
+        } else if (job.current_step === "queued" || job.status === "queued") {
+          setUploadStage("Queued for background processing...");
+        }
+      });
+
+      setUploadProgress(100);
+      setUploadStage("Analysis ready! Loading sorting options...");
+      toast.success("Labels uploaded and analyzed successfully!");
+
+      setTimeout(() => {
+        navigate(APP_ROUTES.SORT(jobId));
+      }, 400);
+
     } catch (error: any) {
       setIsUploading(false);
       setUploadProgress(0);
-      toast.error(error.message || "Upload failed. Please check backend connection.");
+      toast.error(error.message || "Upload or processing failed. Please try again.");
     }
   };
 

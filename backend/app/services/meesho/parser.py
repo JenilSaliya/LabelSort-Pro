@@ -6,12 +6,8 @@ class MeeshoParser:
     """
     Extract structured information from one Meesho shipping-label page.
 
-    This parser only extracts data.
-    It does not:
-    - create jobs
-    - group labels
-    - sort labels
-    - generate PDFs
+    Optimized with precompiled regular expressions and single-pass
+    product details extraction for high-throughput processing.
     """
 
     COURIER_NAMES = [
@@ -25,36 +21,129 @@ class MeeshoParser:
         "Ekart",
     ]
 
-    PAYMENT_PATTERNS = (
-        (r"\bCOD\b", "COD"),
-        (r"\bPrepaid\b", "Prepaid"),
+    # Precompiled regular expressions for courier detection
+    _COURIER_REGEX = re.compile(
+        r"\b(ValmoPlus|Valmo|Delhivery|Xpress\s*Bees|Shadowfax|Ecom\s*Express|Blue\s*Dart|Ekart)\b",
+        re.IGNORECASE,
+    )
+    _COURIER_CANONICAL = {
+        "valmoplus": "ValmoPlus",
+        "valmo": "Valmo",
+        "delhivery": "Delhivery",
+        "xpress bees": "Xpress Bees",
+        "xpressbees": "Xpress Bees",
+        "shadowfax": "Shadowfax",
+        "ecom express": "Ecom Express",
+        "ecomexpress": "Ecom Express",
+        "blue dart": "Blue Dart",
+        "bluedart": "Blue Dart",
+        "ekart": "Ekart",
+    }
+
+    # Precompiled payment patterns
+    _PAYMENT_COD = re.compile(r"\bCOD\b", re.IGNORECASE)
+    _PAYMENT_PREPAID = re.compile(r"\bPrepaid\b", re.IGNORECASE)
+    _PAYMENT_COD_INSTRUCTION = re.compile(
+        r"Check\s+the\s+payable\s+amount\s+on\s+the\s+app",
+        re.IGNORECASE,
+    )
+
+    # Precompiled tracking number patterns
+    _TRACKING_VALMO = re.compile(r"\bVL\d{13}\b", re.IGNORECASE)
+    _TRACKING_SHADOWFAX = re.compile(r"\bSF[A-Za-z0-9]{8,}\b", re.IGNORECASE)
+    _TRACKING_NUMERIC = re.compile(r"\b\d{14,}\b")
+
+    # Precompiled product details patterns
+    _PRODUCT_SECTION_RE = re.compile(
+        r"Product Details\s+"
+        r"SKU\s+Size\s+Qty\s+Color\s+Order No\."
+        r"\s+"
+        r"(.+?)"
+        r"\s+TAX INVOICE",
+        re.IGNORECASE | re.DOTALL,
+    )
+    _ORDER_MATCH_RE = re.compile(r"([0-9]{10,}_\d+)$")
+    _QTY_COLOR_RE = re.compile(r"\s+(\d+)\s+([A-Za-z]+)$")
+    _SIZE_RE = re.compile(
+        r"(.+?)\s+"
+        r"((?:\d+-\d+\s+Months?)|"
+        r"(?:\d+-\d+\s+Years?))$",
+        re.IGNORECASE,
+    )
+
+    # Precompiled normalization and invoice patterns
+    _WHITESPACE_RE = re.compile(r"\s+")
+    _BLANK_LINES_RE = re.compile(r"\n[ \t]*\n+")
+    _PRODUCT_NAME_RE = re.compile(
+        r"Description\s+"
+        r"HSN\s+"
+        r"Qty\s+"
+        r"Gross Amount\s+"
+        r"Discount\s+"
+        r"Taxable Value\s+"
+        r"Taxes\s+"
+        r"Total\s+"
+        r"(.+?)"
+        r"\s+\d{6}\s+"
+        r"\d+\s+Rs\.",
+        re.IGNORECASE | re.DOTALL,
+    )
+    _PURCHASE_ORDER_RE = re.compile(
+        r"Purchase Order No\.\s+([A-Za-z0-9_-]+)",
+        re.IGNORECASE,
+    )
+    _INVOICE_NO_RE = re.compile(
+        r"Invoice No\.\s+([A-Za-z0-9_-]+)",
+        re.IGNORECASE,
+    )
+    _ORDER_DATE_RE = re.compile(
+        r"Order Date\s+([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
+        re.IGNORECASE,
     )
 
     def parse_page(self, text: str, page_number: int) -> dict:
         """
-        Parse one PDF page.
-
-        Returns a dictionary because 3.6.6 is still the extraction
-        layer. Conversion to LabelFields/Label belongs to 3.6.7.
+        Parse one PDF page using a single-pass extraction pipeline.
         """
-
         text = self._normalize_text(text)
+
+        # 1. Courier partner
+        courier = self._extract_courier(text)
+
+        # 2. Payment type
+        payment_type = self._extract_payment_type(text)
+
+        # 3. Tracking number
+        tracking_number = self._extract_tracking_number(text)
+
+        # 4. Product details (SKU, Size, Qty, Color) in a single pass
+        sku, size, quantity, color = self._extract_product_details(text)
+
+        # 5. Product name
+        product_name = self._extract_product_name(text)
+
+        # 6. Order number
+        order_number = self._extract_order_number(text)
+
+        # 7. Invoice number
+        invoice_number = self._extract_invoice_number(text)
+
+        # 8. Order date
+        order_date = self._extract_order_date(text)
 
         return {
             "page_number": page_number,
-            "courier_partner": self._extract_courier(text),
-            "payment_type": self._extract_payment_type(text),
-            "tracking_number": self._extract_tracking_number(text),
-
-            "sku": self._extract_sku(text),
-            "product_name": self._extract_product_name(text),
-            "size": self._extract_size(text),
-            "quantity": self._extract_quantity(text),
-            "color": self._extract_color(text),
-
-            "order_number": self._extract_order_number(text),
-            "invoice_number": self._extract_invoice_number(text),
-            "order_date": self._extract_order_date(text),
+            "courier_partner": courier,
+            "payment_type": payment_type,
+            "tracking_number": tracking_number,
+            "sku": sku,
+            "product_name": product_name,
+            "size": size,
+            "quantity": quantity,
+            "color": color,
+            "order_number": order_number,
+            "invoice_number": invoice_number,
+            "order_date": order_date,
         }
 
     # =========================================================
@@ -62,13 +151,8 @@ class MeeshoParser:
     # =========================================================
 
     def _normalize_text(self, text: str) -> str:
-        text = text.replace("\r\n", "\n")
-        text = text.replace("\r", "\n")
-
-        # Remove excessive blank lines.
-        text = re.sub(r"\n[ \t]*\n+", "\n", text)
-
-        return text.strip()
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        return self._BLANK_LINES_RE.sub("\n", text).strip()
 
     def _lines(self, text: str) -> list[str]:
         return [
@@ -82,8 +166,13 @@ class MeeshoParser:
     # =========================================================
 
     def _extract_courier(self, text: str) -> Optional[str]:
-        lower_text = text.lower()
+        match = self._COURIER_REGEX.search(text)
+        if match:
+            raw_key = self._WHITESPACE_RE.sub(" ", match.group(1)).strip().lower()
+            return self._COURIER_CANONICAL.get(raw_key, match.group(1))
 
+        # Fallback to direct lowercase scan if spacing differs
+        lower_text = text.lower()
         for courier in self.COURIER_NAMES:
             if courier.lower() in lower_text:
                 return courier
@@ -95,31 +184,13 @@ class MeeshoParser:
     # =========================================================
 
     def _extract_payment_type(self, text: str) -> Optional[str]:
-        """
-        Extract payment type from a Meesho label.
-
-        Meesho labels may explicitly contain:
-            - COD
-            - Prepaid
-
-        Some labels extracted from the PDF may lose the "COD:" prefix
-        but still retain the COD instruction:
-            "Check the payable amount on the app"
-        """
-
-        if re.search(r"\bCOD\b", text, re.IGNORECASE):
+        if self._PAYMENT_COD.search(text):
             return "COD"
 
-        if re.search(r"\bPrepaid\b", text, re.IGNORECASE):
+        if self._PAYMENT_PREPAID.search(text):
             return "Prepaid"
 
-        # Some Meesho COD labels lose the literal "COD:" text
-        # during PDF text extraction, while retaining this instruction.
-        if re.search(
-            r"Check\s+the\s+payable\s+amount\s+on\s+the\s+app",
-            text,
-            re.IGNORECASE,
-        ):
+        if self._PAYMENT_COD_INSTRUCTION.search(text):
             return "COD"
 
         return None
@@ -129,280 +200,87 @@ class MeeshoParser:
     # =========================================================
 
     def _extract_tracking_number(self, text: str) -> Optional[str]:
-        """
-        Extract shipment/tracking number from a Meesho label.
-
-        Tracking formats vary by courier, so we use known identifier
-        patterns instead of assuming that the tracking number is
-        immediately after the courier name.
-        """
-
-        # ---------------------------------------------------------
         # Valmo / ValmoPlus
-        # Example:
-        # VL0084940276858
-        # ---------------------------------------------------------
-        match = re.search(
-            r"\bVL\d{13}\b",
-            text,
-            re.IGNORECASE,
-        )
+        valmo_match = self._TRACKING_VALMO.search(text)
+        if valmo_match:
+            return valmo_match.group(0)
 
-        if match:
-            return match.group(0)
-
-        # ---------------------------------------------------------
         # Shadowfax
-        # Example:
-        # SF3722839927FPL
-        # ---------------------------------------------------------
-        match = re.search(
-            r"\bSF[A-Za-z0-9]{8,}\b",
-            text,
-            re.IGNORECASE,
-        )
+        sf_match = self._TRACKING_SHADOWFAX.search(text)
+        if sf_match:
+            return sf_match.group(0)
 
-        if match:
-            return match.group(0)
-
-        # ---------------------------------------------------------
-        # Delhivery
-        #
-        # Current Meesho samples contain long numeric shipment IDs
-        # such as:
-        #
-        # 1490838744902220
-        #
-        # We deliberately require 14+ digits so that dates, HSN,
-        # quantities, etc. are not accidentally selected.
-        # ---------------------------------------------------------
-        numeric_candidates = re.findall(
-            r"\b\d{14,}\b",
-            text,
-        )
-
+        # Delhivery / Xpress Bees / 14+ digit identifiers
+        numeric_candidates = self._TRACKING_NUMERIC.findall(text)
         for candidate in numeric_candidates:
-
-            # Purchase/order numbers are generally followed by
-            # "_1" in the Product Details section, so do not use
-            # those as tracking numbers.
-            if re.search(
-                rf"{re.escape(candidate)}_\d+\b",
-                text,
-            ):
+            # Skip if part of order number (e.g. 12345678901234_1)
+            if f"{candidate}_" in text:
                 continue
-
             return candidate
 
-        # ---------------------------------------------------------
-        # Xpress Bees
-        #
-        # Current samples contain long numeric identifiers such as:
-        # 134096117511201
-        # ---------------------------------------------------------
-        return None
-    # =========================================================
-    # PRODUCT DETAILS SECTION
-    # =========================================================
-
-    def _extract_product_section(self, text: str) -> Optional[str]:
-        """
-        Return the text between:
-
-            Product Details
-
-        and:
-
-            TAX INVOICE
-
-        The actual PDF extraction can produce either:
-
-            SKU Size Qty Color Order No.
-            SKU_VALUE SIZE QTY COLOR ORDER_NO
-
-        or each value on separate lines.
-
-        Therefore the individual field extractors below support
-        both forms.
-        """
-
-        match = re.search(
-            r"Product Details\s+"
-            r"SKU\s+Size\s+Qty\s+Color\s+Order No\."
-            r"\s+"
-            r"(.+?)"
-            r"\s+TAX INVOICE",
-            text,
-            re.IGNORECASE | re.DOTALL,
-        )
-
-        if match:
-            return match.group(1).strip()
-
         return None
 
-    def _extract_product_values(self, text: str) -> list[str]:
-        section = self._extract_product_section(text)
+    # =========================================================
+    # PRODUCT DETAILS (SINGLE PASS)
+    # =========================================================
 
-        if not section:
-            return []
+    def _extract_product_details(
+        self, text: str
+    ) -> tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
+        """
+        Extracts SKU, Size, Quantity, and Color in a single regex pass.
+        """
+        sec_match = self._PRODUCT_SECTION_RE.search(text)
+        if not sec_match:
+            return None, None, None, None
 
-        # In our tested labels, the product row has this structure:
-        #
-        # SKU
-        # SIZE
-        # QTY
-        # COLOR
-        # ORDER_NO
-        #
-        # PDF text extraction sometimes keeps the whole row on one
-        # line and sometimes separates the values.
+        section = self._WHITESPACE_RE.sub(" ", sec_match.group(1)).strip()
 
-        section = re.sub(r"\s+", " ", section).strip()
-
-        # Order number is the strongest boundary because it has a
-        # known long numeric format followed by "_1".
-        order_match = re.search(
-            r"([0-9]{10,}_\d+)$",
-            section,
-        )
-
+        order_match = self._ORDER_MATCH_RE.search(section)
         if not order_match:
-            return []
-
-        order_number = order_match.group(1)
+            return None, None, None, None
 
         before_order = section[:order_match.start()].strip()
 
-        # Quantity is a single integer immediately before color.
-        qty_match = re.search(
-            r"\s+(\d+)\s+([A-Za-z]+)$",
-            before_order,
-        )
-
+        qty_match = self._QTY_COLOR_RE.search(before_order)
         if not qty_match:
-            return []
+            return None, None, None, None
 
-        quantity = qty_match.group(1)
+        try:
+            quantity = int(qty_match.group(1))
+        except ValueError:
+            quantity = None
+
         color = qty_match.group(2)
 
         before_quantity = before_order[:qty_match.start()].strip()
 
-        # Size is one of the known Meesho size formats.
-        size_match = re.search(
-            r"(.+?)\s+"
-            r"((?:\d+-\d+\s+Months?)|"
-            r"(?:\d+-\d+\s+Years?))$",
-            before_quantity,
-            re.IGNORECASE,
-        )
-
+        size_match = self._SIZE_RE.search(before_quantity)
         if not size_match:
-            return []
+            return None, None, quantity, color
 
         sku = size_match.group(1).strip()
         size = size_match.group(2).strip()
 
-        return [
-            sku,
-            size,
-            quantity,
-            color,
-            order_number,
-        ]
-
-    def _extract_sku(self, text: str) -> Optional[str]:
-        values = self._extract_product_values(text)
-
-        if len(values) >= 1:
-            return values[0]
-
-        return None
-
-    def _extract_size(self, text: str) -> Optional[str]:
-        values = self._extract_product_values(text)
-
-        if len(values) >= 2:
-            return values[1]
-
-        return None
-
-    def _extract_quantity(self, text: str) -> Optional[int]:
-        values = self._extract_product_values(text)
-
-        if len(values) >= 3:
-            try:
-                return int(values[2])
-            except ValueError:
-                return None
-
-        return None
-
-    def _extract_color(self, text: str) -> Optional[str]:
-        values = self._extract_product_values(text)
-
-        if len(values) >= 4:
-            return values[3]
-
-        return None
+        return sku, size, quantity, color
 
     # =========================================================
     # PRODUCT NAME
     # =========================================================
 
     def _extract_product_name(self, text: str) -> Optional[str]:
-        """
-        Product name comes from the invoice Description section.
-
-        Example:
-
-        Description HSN Qty Gross Amount ...
-
-        Kid Clothing,kids combo
-        set,kids co ord set - 6-7 Years
-
-        We intentionally keep this separate from SKU.
-        """
-
-        match = re.search(
-            r"Description\s+"
-            r"HSN\s+"
-            r"Qty\s+"
-            r"Gross Amount\s+"
-            r"Discount\s+"
-            r"Taxable Value\s+"
-            r"Taxes\s+"
-            r"Total\s+"
-            r"(.+?)"
-            r"\s+\d{6}\s+"
-            r"\d+\s+Rs\.",
-            text,
-            re.IGNORECASE | re.DOTALL,
-        )
-
+        match = self._PRODUCT_NAME_RE.search(text)
         if not match:
             return None
 
-        product_name = re.sub(
-            r"\s+",
-            " ",
-            match.group(1),
-        ).strip()
-
-        return product_name
+        return self._WHITESPACE_RE.sub(" ", match.group(1)).strip()
 
     # =========================================================
     # ORDER NUMBER
     # =========================================================
 
     def _extract_order_number(self, text: str) -> Optional[str]:
-        match = re.search(
-            r"Purchase Order No\.\s+"
-            r"([A-Za-z0-9_-]+)",
-            text,
-            re.IGNORECASE,
-        )
-
+        match = self._PURCHASE_ORDER_RE.search(text)
         if match:
             return match.group(1)
 
@@ -413,13 +291,7 @@ class MeeshoParser:
     # =========================================================
 
     def _extract_invoice_number(self, text: str) -> Optional[str]:
-        match = re.search(
-            r"Invoice No\.\s+"
-            r"([A-Za-z0-9_-]+)",
-            text,
-            re.IGNORECASE,
-        )
-
+        match = self._INVOICE_NO_RE.search(text)
         if match:
             return match.group(1)
 
@@ -430,13 +302,7 @@ class MeeshoParser:
     # =========================================================
 
     def _extract_order_date(self, text: str) -> Optional[str]:
-        match = re.search(
-            r"Order Date\s+"
-            r"([0-9]{2}\.[0-9]{2}\.[0-9]{4})",
-            text,
-            re.IGNORECASE,
-        )
-
+        match = self._ORDER_DATE_RE.search(text)
         if match:
             return match.group(1)
 
