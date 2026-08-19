@@ -1,8 +1,11 @@
+import logging
 from datetime import datetime, timedelta
 import shutil
 
 from app.core.config import settings
 from app.utils.json_utils import load_json
+
+logger = logging.getLogger(__name__)
 
 
 class CleanupService:
@@ -50,14 +53,15 @@ class CleanupService:
 
                     shutil.rmtree(job_dir)
 
-                    print(
-                        f"Deleted expired job: "
-                        f"{job_dir.name}"
+                    logger.info(
+                        "Deleted expired job: %s",
+                        job_dir.name,
                     )
 
             except Exception as exc:
 
-                print(
-                    f"Cleanup skipped "
-                    f"{job_dir.name}: {exc}"
-                )
+                logger.warning(
+                    "Cleanup skipped %s: %s",
+                    job_dir.name,
+                    exc,
+                )

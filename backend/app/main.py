@@ -1,4 +1,6 @@
 from fastapi import FastAPI
+import logging
+
 from app.api.v1.api import api_router
 from app.exceptions.custom_exceptions import (
     LabelSortException
@@ -12,9 +14,26 @@ from app.core.exception_handlers import (
 
 from app.core.config import settings
 
+# ── Logging ──────────────────────────────────────────
+logging.basicConfig(
+    level=getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO),
+    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+logger = logging.getLogger(__name__)
+
+# ── Startup ──────────────────────────────────────────
 settings.JOBS_DIR.mkdir(
     parents=True,
     exist_ok=True,
+)
+
+logger.info(
+    "Starting %s v%s [%s]",
+    settings.APP_NAME,
+    settings.VERSION,
+    settings.ENVIRONMENT,
 )
 
 app = FastAPI(

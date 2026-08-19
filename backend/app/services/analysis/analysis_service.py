@@ -52,9 +52,12 @@ class AnalysisService:
 
         sortable_fields = []
 
-        for field_name, label in (
+        for field_name, meta in (
             FIELD_METADATA.items()
         ):
+
+            if not meta.get("sortable", False):
+                continue
 
             counter = counters[field_name]
 
@@ -64,7 +67,7 @@ class AnalysisService:
             sortable_fields.append(
                 SortableField(
                     id=field_name,
-                    label=label,
+                    label=meta["label"],
                     unique_values=len(counter),
                     total_labels=sum(
                         counter.values()

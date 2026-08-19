@@ -23,6 +23,8 @@ class Settings(BaseSettings):
 
     JOB_RETENTION_HOURS: int = 6
 
+    LOG_LEVEL: str = "INFO"
+
     @property
     def cors_origins(self) -> list[str]:
         """

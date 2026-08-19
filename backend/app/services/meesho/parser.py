@@ -192,14 +192,6 @@ class MeeshoParser:
             ):
                 continue
 
-            # Invoice/order IDs in the invoice section should not
-            # be mistaken for shipment IDs.
-            if candidate in {
-                "313354414974188736",
-                "313253363856638656",
-            }:
-                continue
-
             return candidate
 
         # ---------------------------------------------------------
