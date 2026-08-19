@@ -56,9 +56,9 @@ class PDFWriter:
             exist_ok=True,
         )
 
-        with pymupdf.open(str(input_path)) as source_doc:
+        with pymupdf.open(str(input_path)) as doc:
 
-            total_pages = len(source_doc)
+            total_pages = len(doc)
 
             # Validate all page numbers before writing.
             for page_number in page_order:
@@ -68,19 +68,9 @@ class PDFWriter:
                         f"PDF contains {total_pages} pages."
                     )
 
-            # Create output document and insert pages
-            # one at a time in the requested order.
-            with pymupdf.open() as output_doc:
-
-                for page_number in page_order:
-                    page_index = page_number - 1
-                    output_doc.insert_pdf(
-                        source_doc,
-                        from_page=page_index,
-                        to_page=page_index,
-                    )
-
-                output_doc.save(str(output_path))
+            # Reorder pages using PyMuPDF's C-level select method (instantaneous, minimal RAM)
+            doc.select([page_number - 1 for page_number in page_order])
+            doc.save(str(output_path))
 
         logger.info(
             "Wrote %d pages to %s",

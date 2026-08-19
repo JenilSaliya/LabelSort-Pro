@@ -1,6 +1,5 @@
 from pathlib import Path
-
-from pypdf import PdfReader, PdfWriter
+import pymupdf as fitz
 
 
 class PdfMergeService:
@@ -16,26 +15,21 @@ class PdfMergeService:
                 "No PDF files provided for merging."
             )
 
-        writer = PdfWriter()
-
-        for pdf_file in pdf_files:
-
-            if not pdf_file.exists():
-                raise FileNotFoundError(
-                    f"PDF file not found: {pdf_file}"
-                )
-
-            reader = PdfReader(pdf_file)
-
-            for page in reader.pages:
-                writer.add_page(page)
-
         output_pdf.parent.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        with output_pdf.open("wb") as f:
-            writer.write(f)
+        with fitz.open() as merged_doc:
+            for pdf_file in pdf_files:
+                if not pdf_file.exists():
+                    raise FileNotFoundError(
+                        f"PDF file not found: {pdf_file}"
+                    )
 
-        return output_pdf
+                with fitz.open(str(pdf_file)) as doc:
+                    merged_doc.insert_pdf(doc)
+
+            merged_doc.save(str(output_pdf))
+
+        return output_pdf

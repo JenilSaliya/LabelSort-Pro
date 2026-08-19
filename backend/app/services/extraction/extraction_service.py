@@ -69,6 +69,10 @@ class ExtractionService:
                     "text"
                 )
 
+                # Free MuPDF decompression and font caches periodically
+                if (page_index + 1) % 10 == 0:
+                    fitz.TOOLS.store_shrink(100)
+
                 if not text.strip():
                     continue
 
@@ -86,6 +90,9 @@ class ExtractionService:
                 labels.append(
                     label
                 )
+
+            # Final flush of the MuPDF store cache
+            fitz.TOOLS.store_shrink(100)
 
         if not labels:
             raise ValueError(

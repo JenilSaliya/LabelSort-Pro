@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
-from pypdf import PdfReader
+import pymupdf as fitz
 
 from app.core.config import settings
 
@@ -46,19 +46,19 @@ async def validate_not_empty(file: UploadFile) -> None:
 def validate_pdf_integrity(file: UploadFile) -> None:
     """
     Validate that the uploaded file is a readable PDF
-    with at least one page.
+    with at least one page using PyMuPDF (zero Python object overhead).
     """
 
     file.file.seek(0)
 
     try:
-        reader = PdfReader(file.file)
-
-        if len(reader.pages) == 0:
-            raise HTTPException(
-                status_code=400,
-                detail="The uploaded PDF contains no pages."
-            )
+        content = file.file.read()
+        with fitz.open(stream=content, filetype="pdf") as doc:
+            if len(doc) == 0:
+                raise HTTPException(
+                    status_code=400,
+                    detail="The uploaded PDF contains no pages."
+                )
 
     except HTTPException:
         raise
