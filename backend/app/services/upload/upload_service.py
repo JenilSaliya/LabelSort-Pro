@@ -1,7 +1,7 @@
 import shutil
 import logging
 from datetime import datetime
-from fastapi import UploadFile, BackgroundTasks
+from fastapi import UploadFile, BackgroundTasks, HTTPException
 
 from app.services.cleanup.cleanup_service import CleanupService
 from app.services.pdf.pdf_merge_service import PdfMergeService
@@ -12,7 +12,7 @@ from app.utils.validation import (
     validate_pdf,
     validate_not_empty,
     validate_file_size,
-    validate_pdf_integrity,
+    validate_pdf_file_on_disk,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,14 +42,16 @@ class UploadService:
         self.cleanup_service.cleanup_old_jobs()
 
         if not files:
-            raise ValueError("No PDF files uploaded.")
+            raise HTTPException(status_code=400, detail="No PDF files uploaded.")
 
-        # 1. Validate all files
+        if len(files) > 20:
+            raise HTTPException(status_code=400, detail="Maximum 20 files allowed per batch.")
+
+        # 1. Validate initial metadata and magic bytes
         for file in files:
             validate_pdf(file)
             await validate_not_empty(file)
             validate_file_size(file)
-            validate_pdf_integrity(file)
 
         # 2. Create job directory
         job = self.job_service.create_job()
@@ -66,6 +68,9 @@ class UploadService:
                 file.file.seek(0)
                 with open(pdf_path, "wb") as buffer:
                     shutil.copyfileobj(file.file, buffer)
+                
+                # Validate PDF structure directly on disk with zero Python byte allocations
+                validate_pdf_file_on_disk(pdf_path)
                 saved_files.append(pdf_path)
 
             destination = job_dir / "original" / "original.pdf"
@@ -79,6 +84,8 @@ class UploadService:
                     output_pdf=destination,
                 )
 
+            # Validate final merged document
+            validate_pdf_file_on_disk(destination)
             file_size = destination.stat().st_size
 
             # 5. Update initial metadata with file information
@@ -89,6 +96,7 @@ class UploadService:
             metadata["uploaded_file_count"] = len(saved_files)
             metadata["status"] = STATUS_QUEUED
             metadata["current_step"] = "queued"
+            metadata["status_message"] = "Queued for processing..."
             metadata["updated_at"] = datetime.now().isoformat()
             self.job_service.save_metadata(job_id, metadata)
 

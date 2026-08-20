@@ -131,17 +131,12 @@ class MeeshoParser:
         # 4. Product details (SKU, Size, Qty, Color) in a single pass
         sku, size, quantity, color = self._extract_product_details(text)
 
-        # 5. Product name (present in full labels with TAX INVOICE)
-        product_name = self._extract_product_name(text)
-
-        # 6. Order number
-        order_number = self._extract_order_number(text)
-
-        # 7. Invoice number
-        invoice_number = self._extract_invoice_number(text)
-
-        # 8. Order date
-        order_date = self._extract_order_date(text)
+        # 5. Invoice Metadata (only evaluated if TAX INVOICE section is present)
+        has_invoice = "TAX INVOICE" in text or "Tax Invoice" in text or "tax invoice" in text
+        product_name = self._extract_product_name(text) if has_invoice else None
+        order_number = self._extract_order_number(text) if has_invoice else None
+        invoice_number = self._extract_invoice_number(text) if has_invoice else None
+        order_date = self._extract_order_date(text) if has_invoice else None
 
         return {
             "page_number": page_number,

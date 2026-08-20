@@ -2,6 +2,7 @@ import io
 from fastapi.testclient import TestClient
 import pymupdf as fitz
 from pathlib import Path
+from datetime import datetime, timedelta
 
 from app.main import app
 from app.services.job.job_service import JobService
@@ -40,7 +41,7 @@ def create_sample_meesho_pdf_bytes(num_pages: int = 3) -> bytes:
     for i in range(num_pages):
         page = doc.new_page()
         page.insert_text((50, 50), f"Page {i+1}\n" + sample_text)
-    
+
     buf = io.BytesIO()
     doc.save(buf)
     doc.close()
@@ -53,11 +54,11 @@ def create_sample_meesho_pdf_bytes(num_pages: int = 3) -> bytes:
 def test_upload_endpoint_returns_immediately_with_job_id():
     pdf_bytes = create_sample_meesho_pdf_bytes(2)
     files = [("files", ("test_labels.pdf", pdf_bytes, "application/pdf"))]
-    
+
     response = client.post("/upload/", files=files)
     assert response.status_code == 200
     data = response.json()
-    
+
     assert data["success"] is True
     assert "job_id" in data["data"]
     assert data["data"]["status"] == STATUS_QUEUED
@@ -84,16 +85,16 @@ def test_upload_processor_full_lifecycle():
     job = job_service.create_job()
     job_id = job["job_id"]
     job_dir = job["job_dir"]
-    
+
     # Place original PDF
     pdf_bytes = create_sample_meesho_pdf_bytes(4)
     original_path = job_dir / "original" / "original.pdf"
     with open(original_path, "wb") as f:
         f.write(pdf_bytes)
-        
+
     processor = UploadProcessor()
     processor.process_upload_job(job_id)
-    
+
     # Verify completed metadata
     metadata = job_service.get_job(job_id)
     assert metadata["status"] == STATUS_COMPLETED
@@ -102,11 +103,11 @@ def test_upload_processor_full_lifecycle():
     assert metadata["page_count"] == 4
     assert metadata["label_groups"] == 4
     assert metadata["marketplace"] == "meesho"
-    
+
     # Verify cached labels exist
     labels_path = job_dir / "extracted" / "labels.json"
     assert labels_path.exists()
-    
+
     # Verify reports exist
     analysis_path = job_dir / "reports" / "analysis.json"
     excel_path = job_dir / "reports" / "statistics.xlsx"
@@ -122,15 +123,15 @@ def test_upload_processor_failure_handling():
     job = job_service.create_job()
     job_id = job["job_id"]
     job_dir = job["job_dir"]
-    
+
     # Place a corrupt PDF file
     original_path = job_dir / "original" / "original.pdf"
     with open(original_path, "wb") as f:
         f.write(b"%PDF-1.4 corrupt junk bytes that cannot be parsed")
-        
+
     processor = UploadProcessor()
     processor.process_upload_job(job_id)
-    
+
     # Job should NOT be deleted, but marked as failed with error details
     metadata = job_service.get_job(job_id)
     assert metadata["status"] == STATUS_FAILED
@@ -159,7 +160,7 @@ def test_meesho_parser_extracted_fields():
         "Order Date 19.08.2026\n"
         "Prepaid\n"
     )
-    
+
     res = parser.parse_page(sample_text, 1)
     assert res["page_number"] == 1
     assert res["courier_partner"] == "ValmoPlus"
@@ -181,24 +182,22 @@ def test_meesho_parser_extracted_fields():
 def test_cleanup_service_protects_active_jobs():
     job_service = JobService()
     cleanup = CleanupService()
-    
-    # Create active job
+
+    # Create active in-flight job (10 minutes old)
     job = job_service.create_job()
     job_id = job["job_id"]
     job_dir = job["job_dir"]
-    
-    # Set status to processing
+
     metadata = job_service.get_job(job_id)
     metadata["status"] = STATUS_PROCESSING
-    # Force updated_at to 10 days ago
-    metadata["updated_at"] = "2020-01-01T00:00:00"
+    metadata["updated_at"] = (datetime.now() - timedelta(minutes=10)).isoformat()
     job_service.save_metadata(job_id, metadata)
-    
+
     # Run cleanup
     cleanup.cleanup_old_jobs()
-    
+
     # Active job MUST STILL EXIST!
     assert job_dir.exists()
-    
+
     # Clean up test workspace
     job_service.delete_job(job_id)

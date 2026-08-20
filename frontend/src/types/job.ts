@@ -3,8 +3,13 @@ export interface JobMetadata {
   status: string;
   progress?: number;
   current_step?: string;
+  status_message?: string | null;
   pages_processed?: number;
   total_pages?: number;
+  elapsed_seconds?: number | null;
+  eta_seconds?: number | null;
+  eta_formatted?: string | null;
+  processing_speed_pps?: number | null;
   error?: string | null;
   marketplace?: string | null;
   filename?: string | null;

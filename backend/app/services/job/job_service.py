@@ -8,7 +8,9 @@ from app.utils.json_utils import load_json, save_json
 from app.core.config import settings
 from app.core.constants import (
     STATUS_UPLOADED,
+    STATUS_QUEUED,
     STATUS_PROCESSING,
+    STATUS_SORTING,
     STATUS_COMPLETED,
     STATUS_FAILED,
 )
@@ -72,7 +74,7 @@ class JobService:
 
     def get_job(self, job_id: str) -> dict:
         """
-        Loads metadata dictionary for a job.
+        Loads metadata dictionary for a job with crash recovery detection.
         """
         job_dir = (settings.JOBS_DIR / job_id).resolve()
         jobs_root = settings.JOBS_DIR.resolve()
@@ -84,7 +86,33 @@ class JobService:
         if not metadata_path.exists():
             raise FileNotFoundError(f"Job {job_id} not found.")
 
-        return load_json(metadata_path)
+        try:
+            metadata = load_json(metadata_path)
+        except Exception:
+            return {
+                "job_id": job_id,
+                "status": STATUS_FAILED,
+                "error": "Job metadata is unreadable. Please upload again.",
+            }
+
+        # Crash recovery: Detect jobs interrupted by a server restart / crash
+        status = metadata.get("status")
+        if status in {STATUS_PROCESSING, STATUS_SORTING, STATUS_QUEUED}:
+            updated_at_str = metadata.get("updated_at")
+            if updated_at_str:
+                try:
+                    updated_at = datetime.fromisoformat(updated_at_str)
+                    elapsed_since_update = (datetime.now() - updated_at).total_seconds()
+                    # If an in-flight job has had no update for over 5 minutes, the worker died
+                    if elapsed_since_update > 300:
+                        metadata["status"] = STATUS_FAILED
+                        metadata["error"] = "Processing was interrupted by a server restart. Please upload again."
+                        metadata["current_step"] = "failed"
+                        self.save_metadata(job_id, metadata)
+                except Exception:
+                    pass
+
+        return metadata
 
     def save_metadata(self, job_id: str, metadata: dict) -> None:
         """

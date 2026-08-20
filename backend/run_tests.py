@@ -16,6 +16,7 @@ from tests.test_async_upload_pipeline import (
     test_cleanup_service_protects_active_jobs,
 )
 from tests.test_cropped_label_sorting import CroppedLabelSortingTests
+from tests.test_phase2a_optimizations import Phase2AOptimizationTests
 
 
 class AsyncUploadPipelineTests(unittest.TestCase):

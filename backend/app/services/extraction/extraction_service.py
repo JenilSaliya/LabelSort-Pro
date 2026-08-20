@@ -64,11 +64,12 @@ class ExtractionService:
                 if page_number % 50 == 0:
                     fitz.TOOLS.store_shrink(100)
 
-                # Report progress periodically or at the end
-                if on_progress and (page_number % 25 == 0 or page_number == page_count):
+                # Report progress every 20 pages and on the final page
+                if on_progress and (page_number % 20 == 0 or page_number == page_count):
                     on_progress(page_number, page_count)
 
-                if not text.strip():
+                # Fast blank page check without string allocation
+                if not text or text.isspace():
                     continue
 
                 parsed = self.meesho_parser.parse_page(text, page_number)

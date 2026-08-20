@@ -74,7 +74,7 @@ export const labelsortApi = {
   },
 
   /**
-   * Poll Job Status until completed or failed
+   * Poll Job Status with resilient retry and exponential backoff
    */
   async pollJobStatus(
     jobId: string,
@@ -83,20 +83,40 @@ export const labelsortApi = {
     timeoutMs: number = 600000 // 10 minutes maximum polling
   ): Promise<JobMetadata> {
     const startTime = Date.now();
+    let consecutiveErrors = 0;
 
     while (Date.now() - startTime < timeoutMs) {
-      const job = await this.getJob(jobId);
+      try {
+        const job = await this.getJob(jobId);
+        consecutiveErrors = 0; // Reset error counter on success
 
-      if (onProgress) {
-        onProgress(job);
-      }
+        if (onProgress) {
+          onProgress(job);
+        }
 
-      if (job.status === "completed") {
-        return job;
-      }
+        if (job.status === "completed") {
+          return job;
+        }
 
-      if (job.status === "failed") {
-        throw new Error(job.error || "Job processing failed on server.");
+        if (job.status === "failed") {
+          throw new Error(job.error || "Job processing failed on server.");
+        }
+      } catch (err: any) {
+        // If server explicitly returned failed job status, propagate immediately
+        if (err.message && err.message.includes("Job processing failed on server")) {
+          throw err;
+        }
+
+        consecutiveErrors++;
+        // If 5 consecutive transient network errors occur, throw error
+        if (consecutiveErrors >= 5) {
+          throw new Error("Lost connection to processing server. Please check your network.");
+        }
+
+        // Exponential backoff during transient glitch (1s -> 2s -> 4s max)
+        const backoffDelay = Math.min(4000, intervalMs * Math.pow(1.5, consecutiveErrors - 1));
+        await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+        continue;
       }
 
       await new Promise((resolve) => setTimeout(resolve, intervalMs));

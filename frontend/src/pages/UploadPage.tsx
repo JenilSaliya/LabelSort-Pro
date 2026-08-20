@@ -17,6 +17,10 @@ export function UploadPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStage, setUploadStage] = useState("Preparing files...");
+  const [pagesProcessed, setPagesProcessed] = useState<number | null>(null);
+  const [totalPages, setTotalPages] = useState<number | null>(null);
+  const [etaFormatted, setEtaFormatted] = useState<string | null>(null);
+  const [processingSpeedPps, setProcessingSpeedPps] = useState<number | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -112,8 +116,12 @@ export function UploadPage() {
       setIsUploading(true);
       setUploadProgress(10);
       setUploadStage("Uploading labels to server...");
+      setPagesProcessed(null);
+      setTotalPages(null);
+      setEtaFormatted(null);
+      setProcessingSpeedPps(null);
 
-      // 1. Upload file(s) to server (short-lived HTTP request)
+      // 1. Upload file(s) to server (short-lived HTTP request returning job_id)
       const response = await labelsortApi.uploadFiles(
         selectedFiles,
         (percent) => {
@@ -132,13 +140,30 @@ export function UploadPage() {
       setUploadStage("Processing labels on server...");
 
       // 2. Poll server for background extraction and analysis progress
-      const completedJob = await labelsortApi.pollJobStatus(jobId, (job) => {
+      await labelsortApi.pollJobStatus(jobId, (job) => {
         if (job.progress !== undefined && job.progress !== null && job.progress > 0) {
-          // Progress reported by server (10% - 100%)
           setUploadProgress(Math.max(25, job.progress));
         }
 
-        if (job.current_step === "extracting") {
+        if (job.pages_processed !== undefined && job.pages_processed !== null) {
+          setPagesProcessed(job.pages_processed);
+        }
+
+        if (job.total_pages !== undefined && job.total_pages !== null) {
+          setTotalPages(job.total_pages);
+        }
+
+        if (job.eta_formatted) {
+          setEtaFormatted(job.eta_formatted);
+        }
+
+        if (job.processing_speed_pps) {
+          setProcessingSpeedPps(job.processing_speed_pps);
+        }
+
+        if (job.status_message) {
+          setUploadStage(job.status_message);
+        } else if (job.current_step === "extracting") {
           if (job.pages_processed && job.total_pages) {
             setUploadStage(`Extracting labels (${job.pages_processed}/${job.total_pages} pages)...`);
           } else {
@@ -166,6 +191,10 @@ export function UploadPage() {
     } catch (error: any) {
       setIsUploading(false);
       setUploadProgress(0);
+      setPagesProcessed(null);
+      setTotalPages(null);
+      setEtaFormatted(null);
+      setProcessingSpeedPps(null);
       toast.error(error.message || "Upload or processing failed. Please try again.");
     }
   };
@@ -210,6 +239,10 @@ export function UploadPage() {
               progress={uploadProgress}
               fileCount={selectedFiles.length}
               stageText={uploadStage}
+              pagesProcessed={pagesProcessed}
+              totalPages={totalPages}
+              etaFormatted={etaFormatted}
+              processingSpeedPps={processingSpeedPps}
               isComplete={uploadProgress === 100}
             />
           ) : selectedFiles.length === 0 ? (
@@ -260,7 +293,7 @@ export function UploadPage() {
             rightIcon={!isUploading && selectedFiles.length > 0 ? <ArrowRight className="h-4 w-4" /> : undefined}
           >
             {isUploading
-              ? `Uploading... ${uploadProgress}%`
+              ? `Processing... ${uploadProgress}%`
               : selectedFiles.length > 0
               ? `Upload & Prepare Labels (${selectedFiles.length})`
               : "Upload & Prepare Labels"}
