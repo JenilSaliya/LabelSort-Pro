@@ -6,8 +6,8 @@ class MeeshoParser:
     """
     Extract structured information from one Meesho shipping-label page.
 
-    Optimized with precompiled regular expressions and single-pass
-    product details extraction for high-throughput processing.
+    Supports both full Meesho shipping labels (with bottom TAX INVOICE section)
+    and cropped Meesho labels (label-only pages without invoice).
     """
 
     COURIER_NAMES = [
@@ -53,21 +53,33 @@ class MeeshoParser:
     _TRACKING_SHADOWFAX = re.compile(r"\bSF[A-Za-z0-9]{8,}\b", re.IGNORECASE)
     _TRACKING_NUMERIC = re.compile(r"\b\d{14,}\b")
 
-    # Precompiled product details patterns
+    # Precompiled product details patterns (supports full labels and cropped labels)
     _PRODUCT_SECTION_RE = re.compile(
         r"Product Details\s+"
         r"SKU\s+Size\s+Qty\s+Color\s+Order No\."
         r"\s+"
         r"(.+?)"
-        r"\s+TAX INVOICE",
+        r"(?:\s+TAX INVOICE|\Z)",
         re.IGNORECASE | re.DOTALL,
     )
-    _ORDER_MATCH_RE = re.compile(r"([0-9]{10,}_\d+)$")
-    _QTY_COLOR_RE = re.compile(r"\s+(\d+)\s+([A-Za-z]+)$")
+    _PRODUCT_SECTION_FALLBACK_RE = re.compile(
+        r"Product Details\s+(?:SKU\s+Size\s+Qty\s+Color\s+Order No\.\s+)?(.+?)(?:\s+TAX INVOICE|\Z)",
+        re.IGNORECASE | re.DOTALL,
+    )
+    _ORDER_MATCH_RE = re.compile(r"([0-9]{10,}_\d+)")
+    _QTY_COLOR_RE = re.compile(
+        r"\s+(\d+)\s+([A-Za-z]+(?:\s+[A-Za-z]+)?|NA|N/A)$",
+        re.IGNORECASE,
+    )
     _SIZE_RE = re.compile(
-        r"(.+?)\s+"
-        r"((?:\d+-\d+\s+Months?)|"
-        r"(?:\d+-\d+\s+Years?))$",
+        r"^(.*?)\s+("
+        r"(?:\d+-\d+\s+(?:Months?|Years?))|"
+        r"(?:Free\s*Size|FS)|"
+        r"(?:(?:XXS|XS|S|M|L|XL|XXL|XXXL|[2-6]XL))|"
+        r"(?:(?:UK|IND|US)[\s-]*\d+(?:\.\d+)?)|"
+        r"(?:\d{2})|"
+        r"(?:\S+)"
+        r")$",
         re.IGNORECASE,
     )
 
@@ -119,7 +131,7 @@ class MeeshoParser:
         # 4. Product details (SKU, Size, Qty, Color) in a single pass
         sku, size, quantity, color = self._extract_product_details(text)
 
-        # 5. Product name
+        # 5. Product name (present in full labels with TAX INVOICE)
         product_name = self._extract_product_name(text)
 
         # 6. Order number
@@ -221,7 +233,7 @@ class MeeshoParser:
         return None
 
     # =========================================================
-    # PRODUCT DETAILS (SINGLE PASS)
+    # PRODUCT DETAILS (SINGLE PASS — FULL & CROPPED LABELS)
     # =========================================================
 
     def _extract_product_details(
@@ -229,10 +241,13 @@ class MeeshoParser:
     ) -> tuple[Optional[str], Optional[str], Optional[int], Optional[str]]:
         """
         Extracts SKU, Size, Quantity, and Color in a single regex pass.
+        Seamlessly handles both full invoice pages and cropped label-only pages.
         """
         sec_match = self._PRODUCT_SECTION_RE.search(text)
         if not sec_match:
-            return None, None, None, None
+            sec_match = self._PRODUCT_SECTION_FALLBACK_RE.search(text)
+            if not sec_match:
+                return None, None, None, None
 
         section = self._WHITESPACE_RE.sub(" ", sec_match.group(1)).strip()
 
@@ -240,29 +255,29 @@ class MeeshoParser:
         if not order_match:
             return None, None, None, None
 
-        before_order = section[:order_match.start()].strip()
+        product_row = section[:order_match.end()].strip()
+        before_order = product_row[:order_match.start()].strip()
 
-        qty_match = self._QTY_COLOR_RE.search(before_order)
-        if not qty_match:
+        qty_color_match = self._QTY_COLOR_RE.search(before_order)
+        if not qty_color_match:
             return None, None, None, None
 
         try:
-            quantity = int(qty_match.group(1))
+            quantity = int(qty_color_match.group(1))
         except ValueError:
             quantity = None
 
-        color = qty_match.group(2)
+        color = qty_color_match.group(2).strip()
 
-        before_quantity = before_order[:qty_match.start()].strip()
+        before_quantity = before_order[:qty_color_match.start()].strip()
 
         size_match = self._SIZE_RE.search(before_quantity)
-        if not size_match:
-            return None, None, quantity, color
+        if size_match:
+            sku = size_match.group(1).strip()
+            size = size_match.group(2).strip()
+            return sku, size, quantity, color
 
-        sku = size_match.group(1).strip()
-        size = size_match.group(2).strip()
-
-        return sku, size, quantity, color
+        return before_quantity if before_quantity else None, None, quantity, color
 
     # =========================================================
     # PRODUCT NAME

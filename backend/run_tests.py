@@ -15,6 +15,8 @@ from tests.test_async_upload_pipeline import (
     test_meesho_parser_extracted_fields,
     test_cleanup_service_protects_active_jobs,
 )
+from tests.test_cropped_label_sorting import CroppedLabelSortingTests
+
 
 class AsyncUploadPipelineTests(unittest.TestCase):
     def test_upload_endpoint_fast_return(self):
@@ -37,6 +39,7 @@ class AsyncUploadPipelineTests(unittest.TestCase):
 
     def test_cleanup_service_protects_active_jobs(self):
         test_cleanup_service_protects_active_jobs()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

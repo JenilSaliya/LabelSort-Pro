@@ -12,60 +12,56 @@ class Marketplace(str, Enum):
 
 
 class MarketplaceDetector:
+    """
+    Detects e-commerce marketplace from label page text.
+    Supports both full invoice pages and cropped label-only pages.
+    """
 
     def detect(self, text: str) -> Marketplace:
-
         text = text.lower()
 
         # -----------------------------
-        # Meesho
+        # Meesho (Full & Cropped)
         # -----------------------------
-
-        if (
-            "purchase order no." in text
-            and "invoice no." in text
-            and "product details" in text
+        if "product details" in text and (
+            "sku" in text
+            or "order no" in text
+            or "purchase order no." in text
+            or "destination code" in text
+            or "return code" in text
         ):
+            return Marketplace.MEESHO
+
+        if "meesho" in text:
             return Marketplace.MEESHO
 
         # -----------------------------
         # Amazon
         # -----------------------------
-
-        if (
-            "amazon" in text
-            or "amazon transportation services" in text
-        ):
+        if "amazon" in text or "amazon transportation services" in text:
             return Marketplace.AMAZON
 
         # -----------------------------
         # Flipkart
         # -----------------------------
-
-        if (
-            "flipkart" in text
-            or "ekart" in text
-        ):
+        if "flipkart" in text or "ekart" in text:
             return Marketplace.FLIPKART
 
         # -----------------------------
         # Ajio
         # -----------------------------
-
         if "ajio" in text:
             return Marketplace.AJIO
 
         # -----------------------------
         # Myntra
         # -----------------------------
-
         if "myntra" in text:
             return Marketplace.MYNTRA
 
         # -----------------------------
         # Shopify
         # -----------------------------
-
         if "shopify" in text:
             return Marketplace.SHOPIFY
 
