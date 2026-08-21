@@ -68,7 +68,17 @@ export function Topbar({ onToggleMobileSidebar, activeJobId }: TopbarProps) {
           </Badge>
 
           <a
-            href="https://github.com"
+            href="https://github.com/JenilSaliya/LabelSort-Pro/releases/latest"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hidden md:flex items-center gap-1 text-xs font-medium text-primary hover:text-primary/80 px-2.5 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/15 transition-colors border border-primary/20"
+          >
+            <span>Desktop App</span>
+            <ExternalLink className="h-3 w-3" />
+          </a>
+
+          <a
+            href="https://github.com/JenilSaliya/LabelSort-Pro"
             target="_blank"
             rel="noopener noreferrer"
             className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground p-2 rounded-xl hover:bg-muted/60 transition-colors"

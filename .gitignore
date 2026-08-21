@@ -1,14 +1,20 @@
 # Python
 backend/venv/
 backend/temp/
+backend/build/
+backend/dist/
 nextpropmt.txt
 __pycache__/
 *.pyc
 
-# Node
+# Node & Vite
 frontend/node_modules/
 frontend/dist/
 frontend/.env.local
+
+# Tauri Desktop Build & Binary Staging
+frontend/src-tauri/target/
+frontend/src-tauri/binaries/
 
 # Environment
 .env
@@ -18,4 +24,3 @@ frontend/.env.local
 
 # Temporary files
 *.log
-

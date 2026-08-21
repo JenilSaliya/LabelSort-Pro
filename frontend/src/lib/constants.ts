@@ -34,6 +34,8 @@ export const API_BASE_URL = getApiBaseUrl();
 export const MAX_UPLOAD_SIZE_MB = 100;
 export const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
 
+export const DESKTOP_DOWNLOAD_URL = "https://github.com/JenilSaliya/LabelSort-Pro/releases/latest";
+
 export const APP_ROUTES = {
   HOME: "/",
   WORKSPACE: "/app",

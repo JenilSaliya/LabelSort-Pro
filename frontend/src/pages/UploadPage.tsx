@@ -5,8 +5,8 @@ import { UploadProgressCard } from "@/components/upload/UploadProgressCard";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { labelsortApi } from "@/features/labelsort/api/labelsortApi";
-import { APP_ROUTES, MAX_UPLOAD_SIZE_BYTES, MAX_UPLOAD_SIZE_MB } from "@/lib/constants";
-import { UploadCloud, ArrowRight, ShieldCheck, AlertCircle } from "lucide-react";
+import { APP_ROUTES, MAX_UPLOAD_SIZE_BYTES, MAX_UPLOAD_SIZE_MB, DESKTOP_DOWNLOAD_URL } from "@/lib/constants";
+import { UploadCloud, ArrowRight, ShieldCheck, AlertCircle, Monitor, Download } from "lucide-react";
 import { toast } from "sonner";
 
 export function UploadPage() {
@@ -305,6 +305,32 @@ export function UploadPage() {
           <span>Files processed in an isolated secure session</span>
         </div>
       </Card>
+
+      {/* Desktop App Download Recommendation Banner */}
+      <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-card border border-border/80 shadow-sm text-xs text-foreground transition-all">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-primary/10 text-primary shrink-0">
+            <Monitor className="h-4 w-4" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-xs sm:text-sm">
+              Need to process large batches?
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              For larger PDFs and better performance, use the Desktop App.
+            </p>
+          </div>
+        </div>
+        <a
+          href={DESKTOP_DOWNLOAD_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary text-primary hover:text-white font-medium text-xs transition-all shrink-0 border border-primary/20 hover:border-transparent"
+        >
+          <span>Get App</span>
+          <Download className="h-3.5 w-3.5" />
+        </a>
+      </div>
     </div>
   );
 }
