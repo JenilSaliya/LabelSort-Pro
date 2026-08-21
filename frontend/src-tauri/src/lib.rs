@@ -1,6 +1,6 @@
 use std::net::TcpListener;
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::process::Command;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;

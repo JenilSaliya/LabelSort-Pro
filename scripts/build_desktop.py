@@ -5,11 +5,12 @@ Executes full build sequence:
   1. Compiles FastAPI + PyMuPDF sidecar with PyInstaller (--onedir)
   2. Stages sidecar into frontend/src-tauri/binaries/
   3. Builds React/TypeScript frontend (Vite)
-  4. Builds Tauri v2 Windows Installer (NSIS / MSI)
+  4. Prepares updater signing keys and builds Tauri v2 Windows Installer (NSIS / MSI)
 """
 
 import os
 import sys
+import base64
 import shutil
 import subprocess
 from pathlib import Path
@@ -21,13 +22,46 @@ TAURI_DIR = FRONTEND_DIR / "src-tauri"
 BINARIES_DIR = TAURI_DIR / "binaries" / "labelsort-engine"
 
 
-def run_command(cmd, cwd=ROOT_DIR):
+def run_command(cmd, cwd=ROOT_DIR, env=None):
     """Runs a shell command and streams output."""
     print(f"\n[EXEC] {cmd} (cwd: {cwd})")
-    res = subprocess.run(cmd, cwd=cwd, shell=True)
+    merged_env = os.environ.copy()
+    if env:
+        merged_env.update(env)
+    res = subprocess.run(cmd, cwd=cwd, shell=True, env=merged_env)
     if res.returncode != 0:
         print(f"[ERROR] Command failed with exit code {res.returncode}: {cmd}")
         sys.exit(res.returncode)
+
+
+def prepare_signing_key():
+    """
+    Normalizes TAURI_SIGNING_PRIVATE_KEY from environment.
+    Writes key file and sets TAURI_SIGNING_PRIVATE_KEY_PATH for robust Tauri signing.
+    """
+    raw_key = os.environ.get("TAURI_SIGNING_PRIVATE_KEY", "").strip()
+    if not raw_key:
+        return
+
+    # Check if raw_key is a base64 encoded string containing 'untrusted comment:'
+    key_text = raw_key
+    if not raw_key.startswith("untrusted comment:"):
+        try:
+            decoded = base64.b64decode(raw_key).decode("utf-8")
+            if decoded.startswith("untrusted comment:"):
+                key_text = decoded
+        except Exception:
+            pass
+
+    # Ensure newline termination
+    if not key_text.endswith("\n"):
+        key_text += "\n"
+
+    key_file = TAURI_DIR / ".signing.key"
+    key_file.write_text(key_text, encoding="utf-8")
+    os.environ["TAURI_SIGNING_PRIVATE_KEY_PATH"] = str(key_file.resolve())
+    os.environ["TAURI_SIGNING_PRIVATE_KEY"] = key_text
+    print(f"[OK] Prepared signing key at: {key_file}")
 
 
 def main():
@@ -56,9 +90,10 @@ def main():
     print("\n>>> Step 3/4: Compiling React Frontend (Vite)...")
     run_command("npm.cmd run build", cwd=FRONTEND_DIR)
 
-    # 4. Build Tauri Desktop Application
+    # 4. Prepare Signing Keys & Build Tauri Desktop Application
     print("\n>>> Step 4/4: Building Tauri v2 Windows Installer...")
-    # Check if cargo / tauri is available
+    prepare_signing_key()
+
     if shutil.which("cargo") is not None:
         run_command("npm.cmd run tauri:build", cwd=FRONTEND_DIR)
         print("\n" + "=" * 70)
