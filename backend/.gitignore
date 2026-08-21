@@ -8,6 +8,11 @@ venv/
 
 # Temp Jobs
 backend/temp/
+temp/
+
+# PyInstaller build artifacts
+build/
+dist/
 
 # VS Code
 .vscode/

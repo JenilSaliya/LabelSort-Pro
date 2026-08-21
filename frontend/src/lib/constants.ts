@@ -1,9 +1,20 @@
 export function getApiBaseUrl(): string {
+  // 1. Desktop Mode: Check for Tauri/Electron injected URL or port
+  if (typeof window !== "undefined") {
+    const customApiUrl = (window as any).__LABELSORT_API_URL__;
+    if (customApiUrl) {
+      return customApiUrl;
+    }
+    const customPort = (window as any).__LABELSORT_PORT__;
+    if (customPort) {
+      return `http://127.0.0.1:${customPort}`;
+    }
+  }
+
+  // 2. Web Mode: Environment variable from Vite build
   const envUrl = import.meta.env.VITE_API_BASE_URL;
 
-  // If running in browser and envUrl points to localhost/127.0.0.1,
-  // but the current browser is accessing from a local network IP (e.g. mobile 192.168.x.x),
-  // adapt the backend host to match the client's hostname on port 8000.
+  // 3. Mobile / Local Network adaptation
   if (typeof window !== "undefined" && window.location.hostname) {
     const hostname = window.location.hostname;
     if (
