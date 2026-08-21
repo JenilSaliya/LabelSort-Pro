@@ -22,13 +22,10 @@ TAURI_DIR = FRONTEND_DIR / "src-tauri"
 BINARIES_DIR = TAURI_DIR / "binaries" / "labelsort-engine"
 
 
-def run_command(cmd, cwd=ROOT_DIR, env=None):
-    """Runs a shell command and streams output."""
+def run_command(cmd, cwd=ROOT_DIR):
+    """Runs a shell command and streams output using current os.environ."""
     print(f"\n[EXEC] {cmd} (cwd: {cwd})")
-    merged_env = os.environ.copy()
-    if env:
-        merged_env.update(env)
-    res = subprocess.run(cmd, cwd=cwd, shell=True, env=merged_env)
+    res = subprocess.run(cmd, cwd=cwd, shell=True, env=os.environ)
     if res.returncode != 0:
         print(f"[ERROR] Command failed with exit code {res.returncode}: {cmd}")
         sys.exit(res.returncode)
@@ -38,12 +35,14 @@ def prepare_signing_key():
     """
     Normalizes TAURI_SIGNING_PRIVATE_KEY from environment.
     Writes key file and sets TAURI_SIGNING_PRIVATE_KEY_PATH for robust Tauri signing.
+    Removes raw TAURI_SIGNING_PRIVATE_KEY to force Tauri to use the key file path.
     """
     raw_key = os.environ.get("TAURI_SIGNING_PRIVATE_KEY", "").strip()
     if not raw_key:
+        print("[NOTICE] No TAURI_SIGNING_PRIVATE_KEY provided. Skipping key setup.")
         return
 
-    # Check if raw_key is a base64 encoded string containing 'untrusted comment:'
+    # Decode if base64 encoded
     key_text = raw_key
     if not raw_key.startswith("untrusted comment:"):
         try:
@@ -53,15 +52,21 @@ def prepare_signing_key():
         except Exception:
             pass
 
-    # Ensure newline termination
     if not key_text.endswith("\n"):
         key_text += "\n"
 
     key_file = TAURI_DIR / ".signing.key"
     key_file.write_text(key_text, encoding="utf-8")
+    
+    # Configure environment for Tauri CLI
     os.environ["TAURI_SIGNING_PRIVATE_KEY_PATH"] = str(key_file.resolve())
-    os.environ["TAURI_SIGNING_PRIVATE_KEY"] = key_text
-    print(f"[OK] Prepared signing key at: {key_file}")
+    # Delete the raw string variable so Tauri reads exclusively from the valid file path
+    os.environ.pop("TAURI_SIGNING_PRIVATE_KEY", None)
+
+    if "TAURI_SIGNING_PRIVATE_KEY_PASSWORD" not in os.environ or not os.environ["TAURI_SIGNING_PRIVATE_KEY_PASSWORD"]:
+        os.environ["TAURI_SIGNING_PRIVATE_KEY_PASSWORD"] = "labelsortpro2026"
+
+    print(f"[OK] Successfully configured signing key at: {key_file.resolve()}")
 
 
 def main():
