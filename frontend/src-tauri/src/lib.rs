@@ -23,6 +23,7 @@ fn resolve_sidecar_path(app: &AppHandle) -> PathBuf {
     if let Ok(resource_dir) = app.path().resource_dir() {
         let bundled_path = resource_dir
             .join("binaries")
+            .join("labelsort-engine")
             .join(if cfg!(windows) { "labelsort-engine.exe" } else { "labelsort-engine" });
         if bundled_path.exists() {
             return bundled_path;
@@ -41,7 +42,9 @@ fn resolve_sidecar_path(app: &AppHandle) -> PathBuf {
         .and_then(|p| p.parent().map(|p| p.to_path_buf()))
         .unwrap_or_else(|| PathBuf::from("."));
     
-    current_exe_dir.join(if cfg!(windows) { "labelsort-engine.exe" } else { "labelsort-engine" })
+    current_exe_dir
+        .join("labelsort-engine")
+        .join(if cfg!(windows) { "labelsort-engine.exe" } else { "labelsort-engine" })
 }
 
 /// Polls the health check endpoint until the backend is fully responsive
@@ -66,7 +69,8 @@ fn wait_for_backend_ready(port: u16, max_attempts: u32) -> bool {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let sidecar_holder = Arc::new(Mutex::new(None));
-    let sidecar_clone = Arc::clone(&sidecar_holder);
+    let sidecar_setup = Arc::clone(&sidecar_holder);
+    let sidecar_exit = Arc::clone(&sidecar_holder);
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -94,7 +98,7 @@ pub fn run() {
 
             match command.spawn() {
                 Ok(child) => {
-                    let mut lock = sidecar_clone.lock().unwrap();
+                    let mut lock = sidecar_setup.lock().unwrap();
                     *lock = Some(child);
                     println!("[Tauri Supervisor] Sidecar spawned successfully.");
                 }
@@ -130,11 +134,10 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("Error while building Tauri application")
-        .run(|app_handle, event| {
+        .run(move |_app_handle, event| {
             if let RunEvent::Exit = event {
                 // Ensure Python sidecar child process is terminated cleanly
-                let state = app_handle.state::<SidecarProcess>();
-                if let Ok(mut lock) = state.0.lock() {
+                if let Ok(mut lock) = sidecar_exit.lock() {
                     if let Some(mut child) = lock.take() {
                         println!("[Tauri Supervisor] Terminating sidecar child process on exit...");
                         let _ = child.kill();
