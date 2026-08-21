@@ -6,9 +6,6 @@ use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
 
-// Managed state holding the Python sidecar child process
-struct SidecarProcess(Arc<Mutex<Option<Child>>>);
-
 /// Finds an available ephemeral port on the 127.0.0.1 loopback interface
 fn find_free_port() -> u16 {
     TcpListener::bind("127.0.0.1:0")
@@ -74,7 +71,6 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
-        .manage(SidecarProcess(sidecar_holder))
         .setup(move |app| {
             let port = find_free_port();
             let parent_pid = std::process::id();
