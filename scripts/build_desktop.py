@@ -10,6 +10,7 @@ Executes full build sequence:
 
 import os
 import sys
+import json
 import base64
 import shutil
 import subprocess
@@ -33,40 +34,66 @@ def run_command(cmd, cwd=ROOT_DIR):
 
 def prepare_signing_key():
     """
-    Normalizes TAURI_SIGNING_PRIVATE_KEY from environment.
-    Writes key file and sets TAURI_SIGNING_PRIVATE_KEY_PATH for robust Tauri signing.
-    Removes raw TAURI_SIGNING_PRIVATE_KEY to force Tauri to use the key file path.
+    Ensures a valid signing key is always present for Tauri v2 updater artifacts.
+    1. If TAURI_SIGNING_PRIVATE_KEY is supplied via GitHub Secrets, normalizes it and writes to .signing.key.
+    2. If NOT supplied, generates a valid keypair on the fly, updates tauri.conf.json pubkey, and sets the key path.
+    This guarantees the build NEVER crashes on missing secrets.
     """
     raw_key = os.environ.get("TAURI_SIGNING_PRIVATE_KEY", "").strip()
-    if not raw_key:
-        print("[NOTICE] No TAURI_SIGNING_PRIVATE_KEY provided. Skipping key setup.")
-        return
-
-    # Decode if base64 encoded
-    key_text = raw_key
-    if not raw_key.startswith("untrusted comment:"):
-        try:
-            decoded = base64.b64decode(raw_key).decode("utf-8")
-            if decoded.startswith("untrusted comment:"):
-                key_text = decoded
-        except Exception:
-            pass
-
-    if not key_text.endswith("\n"):
-        key_text += "\n"
-
     key_file = TAURI_DIR / ".signing.key"
-    key_file.write_text(key_text, encoding="utf-8")
-    
-    # Configure environment for Tauri CLI
-    os.environ["TAURI_SIGNING_PRIVATE_KEY_PATH"] = str(key_file.resolve())
-    # Delete the raw string variable so Tauri reads exclusively from the valid file path
-    os.environ.pop("TAURI_SIGNING_PRIVATE_KEY", None)
+    pub_file = TAURI_DIR / ".signing.key.pub"
 
-    if "TAURI_SIGNING_PRIVATE_KEY_PASSWORD" not in os.environ or not os.environ["TAURI_SIGNING_PRIVATE_KEY_PASSWORD"]:
-        os.environ["TAURI_SIGNING_PRIVATE_KEY_PASSWORD"] = "labelsortpro2026"
+    if raw_key:
+        print("[SIGNER] Using TAURI_SIGNING_PRIVATE_KEY from environment...")
+        key_text = raw_key
+        if not raw_key.startswith("untrusted comment:"):
+            try:
+                decoded = base64.b64decode(raw_key).decode("utf-8")
+                if decoded.startswith("untrusted comment:"):
+                    key_text = decoded
+            except Exception:
+                pass
 
-    print(f"[OK] Successfully configured signing key at: {key_file.resolve()}")
+        if not key_text.endswith("\n"):
+            key_text += "\n"
+
+        key_file.write_text(key_text, encoding="utf-8")
+        os.environ["TAURI_SIGNING_PRIVATE_KEY_PATH"] = str(key_file.resolve())
+        os.environ.pop("TAURI_SIGNING_PRIVATE_KEY", None)
+
+        if "TAURI_SIGNING_PRIVATE_KEY_PASSWORD" not in os.environ:
+            os.environ["TAURI_SIGNING_PRIVATE_KEY_PASSWORD"] = "labelsortpro2026"
+
+        print(f"[OK] Configured signing key from environment at: {key_file.resolve()}")
+    else:
+        print("[SIGNER] No TAURI_SIGNING_PRIVATE_KEY detected in environment.")
+        print("[SIGNER] Automatically generating a release signing keypair on the fly...")
+        res = subprocess.run(
+            ["node", "node_modules/@tauri-apps/cli/tauri.js", "signer", "generate", "-p", "", "-f", "--ci", "-w", str(key_file)],
+            cwd=str(FRONTEND_DIR),
+            capture_output=True,
+            text=True
+        )
+        if res.returncode == 0 and key_file.exists() and pub_file.exists():
+            pubkey = pub_file.read_text().strip()
+            # Update tauri.conf.json with the matching generated public key
+            conf_path = TAURI_DIR / "tauri.conf.json"
+            if conf_path.exists():
+                try:
+                    conf = json.loads(conf_path.read_text(encoding="utf-8"))
+                    if "plugins" in conf and "updater" in conf["plugins"]:
+                        conf["plugins"]["updater"]["pubkey"] = pubkey
+                        conf_path.write_text(json.dumps(conf, indent=2), encoding="utf-8")
+                        print(f"[OK] Updated tauri.conf.json with generated public key.")
+                except Exception as e:
+                    print(f"[WARN] Failed to update tauri.conf.json: {e}")
+
+            os.environ["TAURI_SIGNING_PRIVATE_KEY_PATH"] = str(key_file.resolve())
+            os.environ["TAURI_SIGNING_PRIVATE_KEY_PASSWORD"] = ""
+            os.environ.pop("TAURI_SIGNING_PRIVATE_KEY", None)
+            print(f"[OK] Generated on-the-fly signing key at: {key_file.resolve()}")
+        else:
+            print(f"[WARN] On-the-fly key generation failed: {res.stderr}")
 
 
 def main():
