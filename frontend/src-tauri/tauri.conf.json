@@ -54,7 +54,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNEQjIwMDNFOTQzMUNGRkYKUldUL3p6R1VQZ0N5UFVSUzlCTFVLZGo5R2hzNXFkUk5WcU5mWWtodlR1bytnSDVlZnljaUhtMUYK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEZCNkMxMDI5QjFCQUUwQQpSV1FLcmh1YkFzRzJEKzhZZG9uNmRNUEI3d2FBdmxrV3YvTnZOaDByUXFndlUzZHFUWnBLUmpLbgo=",
       "endpoints": [
         "https://github.com/JenilSaliya/LabelSort-Pro/releases/latest/download/latest.json"
       ]
